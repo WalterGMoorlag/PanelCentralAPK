@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel Central</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f1117; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 12px; font-family: system-ui, sans-serif; color: #aaa; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+  </style>
+</head>
+<body>
+  <div class="dot"></div>
+  <span>Conectando…</span>
+  <script>
+    window.location.replace('http://100.103.51.127:3333/panel');
+  </script>
+</body>
+</html>

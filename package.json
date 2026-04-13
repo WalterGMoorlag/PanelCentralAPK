@@ -1,0 +1,9 @@
+{
+  "name": "panel-central-apk",
+  "version": "1.0.0",
+  "dependencies": {
+    "@capacitor/android": "^7.6.1",
+    "@capacitor/cli": "^7.6.1",
+    "@capacitor/core": "^7.6.1"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "appId": "com.waltermoorlag.panelcentral",
+  "appName": "Panel Central",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true,
+    "allowNavigation": [
+      "100.103.51.127",
+      "192.168.0.*"
+    ]
+  }
+}
