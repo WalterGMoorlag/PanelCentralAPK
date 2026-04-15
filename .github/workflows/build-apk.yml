@@ -39,6 +39,157 @@ jobs:
           grep -q 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml || \
             sed -i 's/<application/\<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
 
+      - name: Inject custom MainActivity with in-app browser
+        run: |
+          cat > android/app/src/main/java/com/waltermoorlag/panelcentral/MainActivity.java << 'JAVA_EOF'
+          package com.waltermoorlag.panelcentral;
+
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.webkit.CookieManager;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.widget.ImageButton;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+
+              private WebView browserWebView;
+              private View browserContainer;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setupInAppBrowser();
+              }
+
+              private void setupInAppBrowser() {
+                  int dp8  = dp(8);
+                  int dp44 = dp(44);
+                  int dp20 = dp(20);
+
+                  // ── Toolbar ──
+                  LinearLayout toolbar = new LinearLayout(this);
+                  toolbar.setOrientation(LinearLayout.HORIZONTAL);
+                  toolbar.setBackgroundColor(Color.parseColor("#1a1d27"));
+                  toolbar.setPadding(dp8, dp8, dp8, dp8);
+                  toolbar.setMinimumHeight(dp44);
+
+                  ImageButton backBtn = new ImageButton(this);
+                  backBtn.setText("←");
+                  backBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20);
+                  backBtn.setBackgroundColor(Color.TRANSPARENT);
+                  backBtn.setTextColor(Color.parseColor("#94a3b8"));
+                  backBtn.setPadding(dp8, 0, dp8, 0);
+                  styleAsTextButton(backBtn);
+                  backBtn.setOnClickListener(v -> {
+                      if (browserWebView.canGoBack()) browserWebView.goBack();
+                      else closeBrowser();
+                  });
+
+                  TextView urlBar = new TextView(this);
+                  urlBar.setId(View.generateViewId());
+                  urlBar.setTextColor(Color.parseColor("#64748b"));
+                  urlBar.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+                  urlBar.setSingleLine(true);
+                  urlBar.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                  LinearLayout.LayoutParams urlParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                  urlParams.setMargins(dp8, 0, dp8, 0);
+                  urlBar.setLayoutParams(urlParams);
+
+                  ImageButton closeBtn = new ImageButton(this);
+                  styleAsTextButton(closeBtn);
+                  closeBtn.setText("✕");
+                  closeBtn.setTextColor(Color.parseColor("#94a3b8"));
+                  closeBtn.setPadding(dp8, 0, dp8, 0);
+                  closeBtn.setOnClickListener(v -> closeBrowser());
+
+                  toolbar.addView(backBtn);
+                  toolbar.addView(urlBar);
+                  toolbar.addView(closeBtn);
+
+                  // ── Browser WebView ──
+                  browserWebView = new WebView(this);
+                  WebSettings ws = browserWebView.getSettings();
+                  ws.setJavaScriptEnabled(true);
+                  ws.setDomStorageEnabled(true);
+                  ws.setLoadWithOverviewMode(true);
+                  ws.setUseWideViewPort(true);
+                  ws.setSupportZoom(true);
+                  ws.setBuiltInZoomControls(true);
+                  ws.setDisplayZoomControls(false);
+                  CookieManager.getInstance().setAcceptCookie(true);
+                  CookieManager.getInstance().setAcceptThirdPartyCookies(browserWebView, true);
+
+                  browserWebView.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public void onPageFinished(WebView view, String url) {
+                          urlBar.setText(url);
+                      }
+                  });
+
+                  // ── Container ──
+                  LinearLayout container = new LinearLayout(this);
+                  container.setOrientation(LinearLayout.VERTICAL);
+                  container.setBackgroundColor(Color.parseColor("#0f1117"));
+                  container.addView(toolbar, new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                  container.addView(browserWebView, new LinearLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+                  container.setVisibility(View.GONE);
+                  browserContainer = container;
+
+                  FrameLayout root = findViewById(android.R.id.content);
+                  root.addView(container, new FrameLayout.LayoutParams(
+                      ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+                  // ── JS Bridge ──
+                  getBridge().getWebView().addJavascriptInterface(new Object() {
+                      @android.webkit.JavascriptInterface
+                      public void openUrl(String url) {
+                          runOnUiThread(() -> {
+                              browserWebView.loadUrl(url);
+                              browserContainer.setVisibility(View.VISIBLE);
+                          });
+                      }
+                      @android.webkit.JavascriptInterface
+                      public void close() {
+                          runOnUiThread(() -> closeBrowser());
+                      }
+                  }, "AndroidBridge");
+              }
+
+              private void closeBrowser() {
+                  browserContainer.setVisibility(View.GONE);
+              }
+
+              private void styleAsTextButton(ImageButton btn) {
+                  btn.setBackgroundColor(Color.TRANSPARENT);
+                  btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+              }
+
+              private int dp(int dp) {
+                  return Math.round(dp * getResources().getDisplayMetrics().density);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (browserContainer != null && browserContainer.getVisibility() == View.VISIBLE) {
+                      if (browserWebView.canGoBack()) browserWebView.goBack();
+                      else closeBrowser();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          JAVA_EOF
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
