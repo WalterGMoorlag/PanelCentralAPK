@@ -52,8 +52,8 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import android.widget.Button;
           import android.widget.FrameLayout;
-          import android.widget.ImageButton;
           import android.widget.LinearLayout;
           import android.widget.TextView;
           import com.getcapacitor.BridgeActivity;
@@ -70,9 +70,8 @@ jobs:
               }
 
               private void setupInAppBrowser() {
-                  int dp8  = dp(8);
+                  int dp8 = dp(8);
                   int dp44 = dp(44);
-                  int dp20 = dp(20);
 
                   // ── Toolbar ──
                   LinearLayout toolbar = new LinearLayout(this);
@@ -81,20 +80,18 @@ jobs:
                   toolbar.setPadding(dp8, dp8, dp8, dp8);
                   toolbar.setMinimumHeight(dp44);
 
-                  ImageButton backBtn = new ImageButton(this);
+                  Button backBtn = new Button(this);
                   backBtn.setText("←");
-                  backBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20);
+                  backBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
                   backBtn.setBackgroundColor(Color.TRANSPARENT);
                   backBtn.setTextColor(Color.parseColor("#94a3b8"));
                   backBtn.setPadding(dp8, 0, dp8, 0);
-                  styleAsTextButton(backBtn);
                   backBtn.setOnClickListener(v -> {
                       if (browserWebView.canGoBack()) browserWebView.goBack();
                       else closeBrowser();
                   });
 
                   TextView urlBar = new TextView(this);
-                  urlBar.setId(View.generateViewId());
                   urlBar.setTextColor(Color.parseColor("#64748b"));
                   urlBar.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
                   urlBar.setSingleLine(true);
@@ -103,9 +100,10 @@ jobs:
                   urlParams.setMargins(dp8, 0, dp8, 0);
                   urlBar.setLayoutParams(urlParams);
 
-                  ImageButton closeBtn = new ImageButton(this);
-                  styleAsTextButton(closeBtn);
+                  Button closeBtn = new Button(this);
                   closeBtn.setText("✕");
+                  closeBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+                  closeBtn.setBackgroundColor(Color.TRANSPARENT);
                   closeBtn.setTextColor(Color.parseColor("#94a3b8"));
                   closeBtn.setPadding(dp8, 0, dp8, 0);
                   closeBtn.setOnClickListener(v -> closeBrowser());
@@ -130,7 +128,7 @@ jobs:
                   browserWebView.setWebViewClient(new WebViewClient() {
                       @Override
                       public void onPageFinished(WebView view, String url) {
-                          urlBar.setText(url);
+                          runOnUiThread(() -> urlBar.setText(url));
                       }
                   });
 
@@ -167,11 +165,6 @@ jobs:
 
               private void closeBrowser() {
                   browserContainer.setVisibility(View.GONE);
-              }
-
-              private void styleAsTextButton(ImageButton btn) {
-                  btn.setBackgroundColor(Color.TRANSPARENT);
-                  btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
               }
 
               private int dp(int dp) {
