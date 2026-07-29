@@ -1,6 +1,6 @@
 {
   "appId": "com.waltermoorlag.panelcentral",
-  "appName": "Panel Central",
+  "appName": "Delivery Panel",
   "webDir": "www",
   "server": {
     "androidScheme": "http",
