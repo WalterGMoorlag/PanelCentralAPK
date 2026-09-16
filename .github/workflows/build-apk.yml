@@ -43,9 +43,12 @@ jobs:
         # Sin esto, el WebView ni siquiera puede PEDIR el permiso de micrófono — hace falta
         # además del onPermissionRequest en MainActivity.java (ver paso siguiente): uno sin el
         # otro no alcanza para que getUserMedia/SpeechRecognition del dictado por voz funcionen.
+        # MODIFY_AUDIO_SETTINGS: en algunos devices (reportado sobre todo en Xiaomi/MIUI) el
+        # WebView tira NotReadableError "Could not start audio source" al abrir el AudioRecord
+        # aunque RECORD_AUDIO ya esté concedido — este permiso adicional es lo que suele resolverlo.
         run: |
           grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml || \
-            sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application#' android/app/src/main/AndroidManifest.xml
+            sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <application#' android/app/src/main/AndroidManifest.xml
 
       - name: Inject custom MainActivity with in-app browser
         run: |
