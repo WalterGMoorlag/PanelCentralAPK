@@ -94,7 +94,7 @@ jobs:
               // comportamiento default de Capacitor — ej. el file chooser que usa "adjuntar imagen".
               private void setupMicPermissionBridge() {
                   WebView mainWebView = getBridge().getWebView();
-                  mainWebView.setWebChromeClient(new BridgeWebChromeClient(this) {
+                  mainWebView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
                       @Override
                       public void onPermissionRequest(final PermissionRequest request) {
                           boolean wantsAudio = false;
