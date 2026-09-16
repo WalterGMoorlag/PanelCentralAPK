@@ -6,6 +6,7 @@
     "androidScheme": "http",
     "cleartext": true,
     "allowNavigation": [
+      "macbook-pro-de-walter.taile37dc2.ts.net",
       "100.103.51.127",
       "192.168.0.*"
     ]
