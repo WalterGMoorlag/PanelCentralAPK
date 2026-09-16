@@ -39,16 +39,27 @@ jobs:
           grep -q 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml || \
             sed -i 's/<application/\<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
 
+      - name: Add RECORD_AUDIO permission to AndroidManifest
+        # Sin esto, el WebView ni siquiera puede PEDIR el permiso de micrófono — hace falta
+        # además del onPermissionRequest en MainActivity.java (ver paso siguiente): uno sin el
+        # otro no alcanza para que getUserMedia/SpeechRecognition del dictado por voz funcionen.
+        run: |
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml || \
+            sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application#' android/app/src/main/AndroidManifest.xml
+
       - name: Inject custom MainActivity with in-app browser
         run: |
           cat > android/app/src/main/java/com/waltermoorlag/panelcentral/MainActivity.java << 'JAVA_EOF'
           package com.waltermoorlag.panelcentral;
 
+          import android.Manifest;
+          import android.content.pm.PackageManager;
           import android.graphics.Color;
           import android.os.Bundle;
           import android.view.View;
           import android.view.ViewGroup;
           import android.webkit.CookieManager;
+          import android.webkit.PermissionRequest;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -56,17 +67,64 @@ jobs:
           import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.TextView;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
           import com.getcapacitor.BridgeActivity;
+          import com.getcapacitor.BridgeWebChromeClient;
 
           public class MainActivity extends BridgeActivity {
 
               private WebView browserWebView;
               private View browserContainer;
 
+              private static final int MIC_PERMISSION_REQUEST_CODE = 1001;
+              private PermissionRequest pendingWebPermissionRequest;
+
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
+                  setupMicPermissionBridge();
                   setupInAppBrowser();
+              }
+
+              // Un WebView (a diferencia de Chrome de verdad) no soporta getUserMedia/SpeechRecognition
+              // de fábrica — hace falta interceptar el pedido de permiso acá y, si el usuario todavía
+              // no le dio RECORD_AUDIO a la app, pedírselo en runtime (Android 6+). Extiende
+              // BridgeWebChromeClient (no un WebChromeClient nuevo de cero) para no perder nada del
+              // comportamiento default de Capacitor — ej. el file chooser que usa "adjuntar imagen".
+              private void setupMicPermissionBridge() {
+                  WebView mainWebView = getBridge().getWebView();
+                  mainWebView.setWebChromeClient(new BridgeWebChromeClient(this) {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {
+                          boolean wantsAudio = false;
+                          for (String resource : request.getResources()) {
+                              if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) wantsAudio = true;
+                          }
+                          if (!wantsAudio) { super.onPermissionRequest(request); return; }
+
+                          if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                  == PackageManager.PERMISSION_GRANTED) {
+                              request.grant(new String[]{ PermissionRequest.RESOURCE_AUDIO_CAPTURE });
+                          } else {
+                              pendingWebPermissionRequest = request;
+                              ActivityCompat.requestPermissions(MainActivity.this,
+                                  new String[]{ Manifest.permission.RECORD_AUDIO }, MIC_PERMISSION_REQUEST_CODE);
+                          }
+                      }
+                  });
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  if (requestCode != MIC_PERMISSION_REQUEST_CODE || pendingWebPermissionRequest == null) return;
+                  if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                      pendingWebPermissionRequest.grant(new String[]{ PermissionRequest.RESOURCE_AUDIO_CAPTURE });
+                  } else {
+                      pendingWebPermissionRequest.deny();
+                  }
+                  pendingWebPermissionRequest = null;
               }
 
               private void setupInAppBrowser() {
