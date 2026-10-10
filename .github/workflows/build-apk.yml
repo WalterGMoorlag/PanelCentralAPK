@@ -199,18 +199,25 @@ jobs:
                       // En vez de navegar, se le pasa la URL al panel, que la reenvía a la Mac
                       // para cerrar el login. Se usa el flujo normal y no --no-launch-browser
                       // porque el remoto lo bloquea la organización ("Account restricted").
+                      //
+                      // Se sobreescriben las DOS variantes a propósito: la de String está
+                      // deprecada y Android NO la llama en API 24+ (usa la de WebResourceRequest).
+                      // Con solo la vieja, en un celular moderno la intercepción nunca dispara.
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                          return handleGcloudRedirect(request.getUrl().toString());
+                      }
+
                       @Override
                       public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                          if (url != null && url.startsWith("http://localhost:") && url.contains("code=")) {
-                              final String captured = url;
-                              runOnUiThread(() -> {
-                                  closeBrowser();
-                                  getBridge().getWebView().evaluateJavascript(
-                                      "window.__gcloudRedirect && window.__gcloudRedirect(" + JSONObject.quote(captured) + ")", null);
-                              });
-                              return true;   // true = no la cargues
-                          }
-                          return false;
+                          return handleGcloudRedirect(url);
+                      }
+
+                      // onPageStarted como red de seguridad: algunos redirects 302 no pasan por
+                      // shouldOverrideUrlLoading, pero sí llegan acá.
+                      @Override
+                      public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                          if (!handleGcloudRedirect(url)) super.onPageStarted(view, url, favicon);
                       }
                   });
 
@@ -243,6 +250,23 @@ jobs:
                           runOnUiThread(() -> closeBrowser());
                       }
                   }, "AndroidBridge");
+              }
+
+              // Devuelve true si la URL era el redirect del login de gcloud (y ya la despachó).
+              // `handled` evita despacharla dos veces, porque la escuchan varios callbacks.
+              private String lastGcloudRedirect = null;
+              private boolean handleGcloudRedirect(String url) {
+                  if (url == null || !url.startsWith("http://localhost:") || !url.contains("code=")) return false;
+                  if (url.equals(lastGcloudRedirect)) return true;
+                  lastGcloudRedirect = url;
+                  final String captured = url;
+                  runOnUiThread(() -> {
+                      try { browserWebView.stopLoading(); } catch (Exception ignored) {}
+                      closeBrowser();
+                      getBridge().getWebView().evaluateJavascript(
+                          "window.__gcloudRedirect && window.__gcloudRedirect(" + JSONObject.quote(captured) + ")", null);
+                  });
+                  return true;
               }
 
               private void closeBrowser() {
