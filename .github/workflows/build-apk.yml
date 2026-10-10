@@ -72,6 +72,7 @@ jobs:
           import android.widget.TextView;
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
+          import org.json.JSONObject;
           import com.getcapacitor.BridgeActivity;
           import com.getcapacitor.BridgeWebChromeClient;
 
@@ -190,6 +191,26 @@ jobs:
                       @Override
                       public void onPageFinished(WebView view, String url) {
                           runOnUiThread(() -> urlBar.setText(url));
+                      }
+
+                      // Intercepta el redirect final del login de gcloud. El flujo normal de
+                      // `gcloud auth login` redirige a http://localhost:<puerto>/?code=..., donde
+                      // ese localhost es la MAC — desde el celular no existe y la carga fallaría.
+                      // En vez de navegar, se le pasa la URL al panel, que la reenvía a la Mac
+                      // para cerrar el login. Se usa el flujo normal y no --no-launch-browser
+                      // porque el remoto lo bloquea la organización ("Account restricted").
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                          if (url != null && url.startsWith("http://localhost:") && url.contains("code=")) {
+                              final String captured = url;
+                              runOnUiThread(() -> {
+                                  closeBrowser();
+                                  getBridge().getWebView().evaluateJavascript(
+                                      "window.__gcloudRedirect && window.__gcloudRedirect(" + JSONObject.quote(captured) + ")", null);
+                              });
+                              return true;   // true = no la cargues
+                          }
+                          return false;
                       }
                   });
 
