@@ -263,10 +263,46 @@ jobs:
                   runOnUiThread(() -> {
                       try { browserWebView.stopLoading(); } catch (Exception ignored) {}
                       closeBrowser();
-                      getBridge().getWebView().evaluateJavascript(
-                          "window.__gcloudRedirect && window.__gcloudRedirect(" + JSONObject.quote(captured) + ")", null);
                   });
+                  // El POST lo hace JAVA, no el JS del panel. Al volver del navegador embebido
+                  // Android recrea el WebView principal y recarga el panel, así que un
+                  // evaluateJavascript("window.__gcloudRedirect(...)") caía en un contexto ya
+                  // destruido y se perdía en silencio (la guarda `&&` lo volvía un no-op).
+                  // Desde Java no dependemos del estado del WebView.
+                  new Thread(() -> {
+                      try {
+                          java.net.HttpURLConnection c =
+                              (java.net.HttpURLConnection) new java.net.URL(panelOrigin() + "/api/panel/gcloud-login/redirect").openConnection();
+                          c.setRequestMethod("POST");
+                          c.setRequestProperty("Content-Type", "application/json");
+                          c.setDoOutput(true);
+                          c.setConnectTimeout(15000); c.setReadTimeout(30000);
+                          String payload = new JSONObject().put("url", captured).toString();
+                          c.getOutputStream().write(payload.getBytes("UTF-8"));
+                          c.getInputStream().close();
+                      } catch (Exception ignored) {
+                          // Si falla, queda el campo manual del panel para pegar la URL a mano.
+                      }
+                      // Mejor esfuerzo: refrescar la UI si para entonces ya hay un contexto JS vivo.
+                      runOnUiThread(() -> {
+                          try {
+                              getBridge().getWebView().evaluateJavascript(
+                                  "window.gcloudLoginOpen && window.gcloudLoginOpen()", null);
+                          } catch (Exception ignored) {}
+                      });
+                  }).start();
                   return true;
+              }
+
+              // Origen del panel leído del propio WebView (ej. https://<host>.ts.net), para no
+              // hardcodear la URL: si cambia el host del panel, esto la sigue sola.
+              private String panelOrigin() {
+                  try {
+                      java.net.URL u = new java.net.URL(getBridge().getWebView().getUrl());
+                      return u.getProtocol() + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
+                  } catch (Exception e) {
+                      return "https://macbook-pro-de-walter.taile37dc2.ts.net";
+                  }
               }
 
               private void closeBrowser() {
